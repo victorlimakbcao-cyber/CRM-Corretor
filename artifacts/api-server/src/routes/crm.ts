@@ -1,5 +1,5 @@
 import { Router, type IRouter, type RequestHandler } from "express";
-import { and, asc, desc, eq, ilike, or } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, isNotNull, isNull, or } from "drizzle-orm";
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import {
@@ -166,6 +166,7 @@ const mapLead = (lead: typeof leadsTable.$inferSelect) => ({
   ...lead,
   createdAt: iso(lead.createdAt),
   updatedAt: undefined,
+  deletedAt: lead.deletedAt ? iso(lead.deletedAt) : null,
 });
 const mapProperty = (property: typeof propertiesTable.$inferSelect) => ({
   ...property,
@@ -189,7 +190,7 @@ const mapCommission = (commission: typeof commissionsTable.$inferSelect) => comm
 router.get("/dashboard", async (_req, res): Promise<void> => {
   await ensureSeed();
   const [leads, visits, tasks, proposals, commissions] = await Promise.all([
-    db.select().from(leadsTable).orderBy(desc(leadsTable.createdAt)),
+    db.select().from(leadsTable).where(isNull(leadsTable.deletedAt)).orderBy(desc(leadsTable.createdAt)),
     db.select().from(visitsTable).orderBy(asc(visitsTable.scheduledDate)),
     db.select().from(tasksTable).orderBy(asc(tasksTable.scheduledDate)),
     db.select().from(proposalsTable).orderBy(desc(proposalsTable.createdAt)),
@@ -246,13 +247,56 @@ router.get("/activity", async (_req, res): Promise<void> => {
 router.get("/leads", async (req, res): Promise<void> => {
   await ensureSeed();
   const query = ListLeadsQueryParams.parse(req.query);
-  const conditions = [];
+  const conditions = [isNull(leadsTable.deletedAt)];
   if (query.search) conditions.push(or(ilike(leadsTable.name, `%${query.search}%`), ilike(leadsTable.phone, `%${query.search}%`), ilike(leadsTable.interest, `%${query.search}%`)));
   if (query.status) conditions.push(eq(leadsTable.status, query.status));
-  const rows = await db.select().from(leadsTable).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(leadsTable.createdAt));
+  const rows = await db.select().from(leadsTable).where(and(...conditions)).orderBy(desc(leadsTable.createdAt));
   const page = query.page ?? 1;
   const items = rows.slice((page - 1) * 20, page * 20).map(mapLead);
   res.json(ListLeadsResponse.parse({ items, total: rows.length, page }));
+});
+
+router.get("/leads/archived", async (_req, res): Promise<void> => {
+  await ensureSeed();
+  const rows = await db.select().from(leadsTable).where(isNotNull(leadsTable.deletedAt)).orderBy(desc(leadsTable.deletedAt));
+  res.json({ items: rows.map(mapLead), total: rows.length });
+});
+
+router.patch("/leads/:id/archive", requireAuth, async (req, res): Promise<void> => {
+  const params = UpdateLeadParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  const [lead] = await db.update(leadsTable)
+    .set({ deletedAt: new Date(), status: "Arquivado" })
+    .where(and(eq(leadsTable.id, params.data.id), isNull(leadsTable.deletedAt)))
+    .returning();
+
+  if (!lead) {
+    const current = await db.select().from(leadsTable).where(eq(leadsTable.id, params.data.id)).limit(1);
+    if (current[0]?.deletedAt) {
+      res.status(409).json({ error: "Lead já está arquivado." });
+      return;
+    }
+    res.status(404).json({ error: "Lead não encontrado" });
+    return;
+  }
+
+  res.json(GetLeadResponse.parse(mapLead(lead)));
+});
+
+router.patch("/leads/:id/restore", requireAuth, async (req, res): Promise<void> => {
+  const params = UpdateLeadParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  const [lead] = await db.update(leadsTable)
+    .set({ deletedAt: null, status: "Ativo" })
+    .where(and(eq(leadsTable.id, params.data.id), isNotNull(leadsTable.deletedAt)))
+    .returning();
+
+  if (!lead) {
+    res.status(404).json({ error: "Lead arquivado não encontrado" });
+    return;
+  }
+
+  res.json(GetLeadResponse.parse(mapLead(lead)));
 });
 
 router.post("/leads", requireAuth, async (req, res): Promise<void> => {
@@ -272,7 +316,7 @@ router.get("/leads/:id", async (req, res): Promise<void> => {
   await ensureSeed();
   const params = GetLeadParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
-  const [lead] = await db.select().from(leadsTable).where(eq(leadsTable.id, params.data.id));
+  const [lead] = await db.select().from(leadsTable).where(and(eq(leadsTable.id, params.data.id), isNull(leadsTable.deletedAt)));
   if (!lead) { res.status(404).json({ error: "Lead não encontrado" }); return; }
   res.json(GetLeadResponse.parse(mapLead(lead)));
 });
@@ -281,7 +325,10 @@ router.patch("/leads/:id", requireAuth, async (req, res): Promise<void> => {
   const params = UpdateLeadParams.safeParse(req.params);
   const body = UpdateLeadBody.safeParse(req.body);
   if (!params.success || !body.success) { res.status(400).json({ error: "Dados inválidos" }); return; }
-  const [lead] = await db.update(leadsTable).set(body.data).where(eq(leadsTable.id, params.data.id)).returning();
+  const [lead] = await db.update(leadsTable)
+    .set({ ...body.data, deletedAt: body.data.deletedAt ? new Date(body.data.deletedAt) : undefined })
+    .where(and(eq(leadsTable.id, params.data.id), isNull(leadsTable.deletedAt)))
+    .returning();
   if (!lead) { res.status(404).json({ error: "Lead não encontrado" }); return; }
   res.json(GetLeadResponse.parse(mapLead(lead)));
 });
@@ -289,23 +336,46 @@ router.patch("/leads/:id", requireAuth, async (req, res): Promise<void> => {
 router.delete("/leads/:id", requireAuth, async (req, res): Promise<void> => {
   const params = DeleteLeadParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
-  const [lead] = await db.delete(leadsTable).where(eq(leadsTable.id, params.data.id)).returning();
+
+  const [lead] = await db.select().from(leadsTable).where(eq(leadsTable.id, params.data.id));
   if (!lead) { res.status(404).json({ error: "Lead não encontrado" }); return; }
-  res.sendStatus(204);
+
+  const relatedRecords = {
+    visits: (await db.select({ id: visitsTable.id }).from(visitsTable).where(eq(visitsTable.clientName, lead.name)).limit(1)).length > 0,
+    tasks: (await db.select({ id: tasksTable.id }).from(tasksTable).where(eq(tasksTable.clientName, lead.name)).limit(1)).length > 0,
+    proposals: (await db.select({ id: proposalsTable.id }).from(proposalsTable).where(eq(proposalsTable.clientName, lead.name)).limit(1)).length > 0,
+  };
+
+  const [updatedLead] = await db.update(leadsTable)
+    .set({ deletedAt: new Date(), status: relatedRecords.visits || relatedRecords.tasks || relatedRecords.proposals ? "Arquivado" : "Excluído" })
+    .where(eq(leadsTable.id, params.data.id))
+    .returning();
+
+  if (!updatedLead) { res.status(404).json({ error: "Lead não encontrado" }); return; }
+
+  res.status(200).json({
+    success: true,
+    deletedAt: updatedLead.deletedAt ? updatedLead.deletedAt.toISOString() : null,
+    relatedRecords: Object.values(relatedRecords).some(Boolean),
+    message: Object.values(relatedRecords).some(Boolean)
+      ? "Lead arquivado com segurança. Registros relacionados foram preservados."
+      : "Lead excluído com segurança.",
+  });
 });
 
 router.get("/clients", async (req, res): Promise<void> => {
   await ensureSeed();
   const query = ListClientsQueryParams.parse(req.query);
-  const conditions = query.search ? [or(ilike(leadsTable.name, `%${query.search}%`), ilike(leadsTable.phone, `%${query.search}%`))] : [];
-  const rows = await db.select().from(leadsTable).where(conditions.length ? and(...conditions) : undefined);
+  const conditions = [isNull(leadsTable.deletedAt)];
+  if (query.search) conditions.push(or(ilike(leadsTable.name, `%${query.search}%`), ilike(leadsTable.phone, `%${query.search}%`)));
+  const rows = await db.select().from(leadsTable).where(and(...conditions));
   res.json(ListClientsResponse.parse(rows.filter((lead) => lead.stage !== "Novo Lead").map((lead) => ({ ...mapLead(lead), propertyCount: 3, matchScore: 96 }))));
 });
 
 router.get("/clients/:id", async (req, res): Promise<void> => {
   await ensureSeed();
   const params = GetClientParams.parse(req.params);
-  const [lead] = await db.select().from(leadsTable).where(eq(leadsTable.id, params.id));
+  const [lead] = await db.select().from(leadsTable).where(and(eq(leadsTable.id, params.id), isNull(leadsTable.deletedAt)));
   if (!lead) { res.status(404).json({ error: "Cliente não encontrado" }); return; }
   const properties = await db.select().from(propertiesTable).limit(4);
   const activities = await db.select().from(activitiesTable).orderBy(desc(activitiesTable.createdAt)).limit(8);
@@ -412,7 +482,11 @@ router.get("/commissions", async (_req, res): Promise<void> => { await ensureSee
 router.get("/reports", async (_req, res): Promise<void> => {
   await ensureSeed();
   const [leads, properties, visits, proposals, commissions] = await Promise.all([
-    db.select().from(leadsTable), db.select().from(propertiesTable), db.select().from(visitsTable), db.select().from(proposalsTable), db.select().from(commissionsTable),
+    db.select().from(leadsTable).where(isNull(leadsTable.deletedAt)),
+    db.select().from(propertiesTable),
+    db.select().from(visitsTable),
+    db.select().from(proposalsTable),
+    db.select().from(commissionsTable),
   ]);
   const count = (values: string[]) => [...new Set(values)].map((label) => ({ label, value: values.filter((value) => value === label).length }));
   res.json(GetReportsResponse.parse({
