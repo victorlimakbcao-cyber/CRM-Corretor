@@ -34,6 +34,7 @@ export const leadsTable = pgTable("crm_leads", {
   nextContact: date("next_contact", { mode: "string" }),
   status: text("status").notNull().default("Ativo"),
   notes: text("notes"),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   ...timestamps,
 });
 
