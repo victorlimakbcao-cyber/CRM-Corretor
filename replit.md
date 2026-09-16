@@ -1,6 +1,6 @@
-# [Project name]
+# CRM Corretor
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+CRM imobiliário para corretores brasileiros organizarem leads, imóveis, negociações e próximos passos em um só lugar.
 
 ## Run & Operate
 
@@ -22,15 +22,22 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/crm-corretor/src/App.tsx` — shell, auth routes, dashboards, CRUD screens and responsive navigation
+- `artifacts/crm-corretor/src/index.css` — design tokens and application theme
+- `artifacts/api-server/src/routes/crm.ts` — CRM API routes and development seed
+- `lib/db/src/schema/crm.ts` — PostgreSQL schema for CRM records
+- `lib/api-spec/openapi.yaml` — source of truth for the generated API client and Zod validators
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- OpenAPI is the contract between the React client and the shared Express API.
+- Clerk owns browser authentication; the API uses the Clerk session cookie and protects mutations.
+- CRM calendar-day fields use PostgreSQL `date` values to avoid timezone shifts.
+- Development data is seeded idempotently on the first CRM API read so the first preview is useful.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+CRM Corretor includes a public product entry page, Clerk sign-in/sign-up, executive dashboard, leads and client 360 views, property inventory, drag-and-drop funnel, tasks, visits, agenda, proposals, captures, commissions, reports, notifications and settings.
 
 ## User preferences
 
@@ -38,7 +45,8 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Run API codegen after changing `lib/api-spec/openapi.yaml`.
+- Run `pnpm run typecheck:libs` before checking packages that import `@workspace/db` or generated API types.
 
 ## Pointers
 

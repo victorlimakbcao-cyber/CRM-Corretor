@@ -1,22 +1,29 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: API do CRM Corretor
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: dashboard
+  - name: leads
+  - name: clients
+  - name: properties
+  - name: tasks
+  - name: visits
+  - name: proposals
+  - name: captures
+  - name: commissions
+  - name: reports
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +31,756 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Resumo executivo do CRM
+      responses:
+        "200":
+          description: Dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /activity:
+    get:
+      operationId: getActivity
+      tags: [dashboard]
+      summary: Atividade recente do corretor
+      responses:
+        "200":
+          description: Activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Activity"
+  /leads:
+    get:
+      operationId: listLeads
+      tags: [leads]
+      summary: Lista leads
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/Page"
+      responses:
+        "200":
+          description: Leads
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadList"
+    post:
+      operationId: createLead
+      tags: [leads]
+      summary: Cria lead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+  /leads/{id}:
+    get:
+      operationId: getLead
+      tags: [leads]
+      summary: Detalha lead
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateLead
+      tags: [leads]
+      summary: Atualiza lead
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+    delete:
+      operationId: deleteLead
+      tags: [leads]
+      summary: Remove lead
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Deleted
+  /clients:
+    get:
+      operationId: listClients
+      tags: [clients]
+      summary: Lista clientes qualificados
+      parameters:
+        - $ref: "#/components/parameters/Search"
+      responses:
+        "200":
+          description: Clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Client"
+  /clients/{id}:
+    get:
+      operationId: getClient
+      tags: [clients]
+      summary: Visão 360 do cliente
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Client
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientDetail"
+  /properties:
+    get:
+      operationId: listProperties
+      tags: [properties]
+      summary: Lista imóveis
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Properties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Property"
+    post:
+      operationId: createProperty
+      tags: [properties]
+      summary: Cadastra imóvel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PropertyInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Property"
+  /properties/{id}:
+    get:
+      operationId: getProperty
+      tags: [properties]
+      summary: Detalha imóvel
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Property
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PropertyDetail"
+    patch:
+      operationId: updateProperty
+      tags: [properties]
+      summary: Atualiza imóvel
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PropertyUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Property"
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: Lista tarefas e follow-ups
+      parameters:
+        - name: filter
+          in: query
+          schema:
+            type: string
+            enum: [today, overdue, tomorrow, week, completed, all]
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Cria tarefa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+  /tasks/{id}:
+    patch:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Atualiza tarefa
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+  /visits:
+    get:
+      operationId: listVisits
+      tags: [visits]
+      summary: Lista visitas
+      responses:
+        "200":
+          description: Visits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Visit"
+    post:
+      operationId: createVisit
+      tags: [visits]
+      summary: Agenda visita
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisitInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Visit"
+  /proposals:
+    get:
+      operationId: listProposals
+      tags: [proposals]
+      summary: Lista propostas
+      responses:
+        "200":
+          description: Proposals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Proposal"
+  /captures:
+    get:
+      operationId: listCaptures
+      tags: [captures]
+      summary: Lista oportunidades de captação
+      responses:
+        "200":
+          description: Captures
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Capture"
+  /commissions:
+    get:
+      operationId: listCommissions
+      tags: [commissions]
+      summary: Lista comissões
+      responses:
+        "200":
+          description: Commissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Commission"
+  /reports:
+    get:
+      operationId: getReports
+      tags: [reports]
+      summary: Dados consolidados de relatórios
+      responses:
+        "200":
+          description: Reports
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reports"
+  /webhooks/leads:
+    post:
+      operationId: receiveLeadWebhook
+      tags: [leads]
+      summary: Recebe lead de integração externa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookLeadInput"
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
 components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    Search:
+      name: search
+      in: query
+      schema:
+        type: string
+    Status:
+      name: status
+      in: query
+      schema:
+        type: string
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+  responses:
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
-
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    Dashboard:
+      type: object
+      required: [stats, funnel, sources, monthly, nextVisits, overdueTasks, latestLeads, commissions]
+      properties:
+        stats:
+          type: object
+          required: [newLeads, activeLeads, noReturn, scheduledVisits, openProposals, closedSales, vgv, potentialValue, expectedCommission, receivedCommission, overdueFollowUps, conversionRate]
+          properties:
+            newLeads: { type: integer }
+            activeLeads: { type: integer }
+            noReturn: { type: integer }
+            scheduledVisits: { type: integer }
+            openProposals: { type: integer }
+            closedSales: { type: integer }
+            vgv: { type: number }
+            potentialValue: { type: number }
+            expectedCommission: { type: number }
+            receivedCommission: { type: number }
+            overdueFollowUps: { type: integer }
+            conversionRate: { type: number }
+        funnel:
+          type: array
+          items: { $ref: "#/components/schemas/FunnelPoint" }
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/CountPoint" }
+        monthly:
+          type: array
+          items: { $ref: "#/components/schemas/MonthlyPoint" }
+        nextVisits:
+          type: array
+          items: { $ref: "#/components/schemas/Visit" }
+        overdueTasks:
+          type: array
+          items: { $ref: "#/components/schemas/Task" }
+        latestLeads:
+          type: array
+          items: { $ref: "#/components/schemas/Lead" }
+        commissions:
+          type: array
+          items: { $ref: "#/components/schemas/Commission" }
+    CountPoint:
+      type: object
+      required: [label, value]
+      properties:
+        label: { type: string }
+        value: { type: integer }
+    FunnelPoint:
+      type: object
+      required: [label, value, color]
+      properties:
+        label: { type: string }
+        value: { type: integer }
+        color: { type: string }
+    MonthlyPoint:
+      type: object
+      required: [month, sales, vgv]
+      properties:
+        month: { type: string }
+        sales: { type: integer }
+        vgv: { type: number }
+    Activity:
+      type: object
+      required: [id, kind, title, description, createdAt]
+      properties:
+        id: { type: integer }
+        kind: { type: string }
+        title: { type: string }
+        description: { type: string }
+        createdAt: { type: string }
+        entityId: { type: ["integer", "null"] }
+    Lead:
+      type: object
+      required: [id, name, phone, source, stage, temperature, interest, budget, city, createdAt, lastContact, nextContact]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        phone: { type: string }
+        email: { type: ["string", "null"] }
+        source: { type: string }
+        campaign: { type: ["string", "null"] }
+        stage: { type: string }
+        temperature: { type: string }
+        interest: { type: string }
+        budget: { type: number }
+        city: { type: string }
+        neighborhoods:
+          type: array
+          items: { type: string }
+        assignedTo: { type: string }
+        createdAt: { type: string }
+        lastContact: { type: string }
+        nextContact: { type: ["string", "null"] }
+        status: { type: string }
+        notes: { type: ["string", "null"] }
+    LeadList:
+      type: object
+      required: [items, total, page]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Lead" }
+        total: { type: integer }
+        page: { type: integer }
+    LeadInput:
+      type: object
+      required: [name, phone, source, interest, budget, city]
+      properties:
+        name: { type: string, minLength: 2 }
+        phone: { type: string }
+        email: { type: string }
+        source: { type: string }
+        interest: { type: string }
+        budget: { type: number }
+        city: { type: string }
+        neighborhoods:
+          type: array
+          items: { type: string }
+        temperature: { type: string }
+        notes: { type: string }
+    LeadUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        phone: { type: string }
+        email: { type: string }
+        stage: { type: string }
+        temperature: { type: string }
+        nextContact: { type: string }
+        notes: { type: string }
+        status: { type: string }
+    Client:
+      allOf:
+        - $ref: "#/components/schemas/Lead"
+        - type: object
+          properties:
+            propertyCount: { type: integer }
+            matchScore: { type: number }
+    ClientDetail:
+      allOf:
+        - $ref: "#/components/schemas/Client"
+        - type: object
+          required: [timeline, recommendations]
+          properties:
+            timeline:
+              type: array
+              items: { $ref: "#/components/schemas/Activity" }
+            recommendations:
+              type: array
+              items: { $ref: "#/components/schemas/Property" }
+    Property:
+      type: object
+      required: [id, code, title, type, purpose, status, price, city, neighborhood, bedrooms, suites, bathrooms, parking, area, image, ownerName, commission, createdAt]
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        title: { type: string }
+        type: { type: string }
+        purpose: { type: string }
+        status: { type: string }
+        price: { type: number }
+        condo: { type: ["number", "null"] }
+        iptu: { type: ["number", "null"] }
+        city: { type: string }
+        neighborhood: { type: string }
+        address: { type: string }
+        bedrooms: { type: integer }
+        suites: { type: integer }
+        bathrooms: { type: integer }
+        parking: { type: integer }
+        area: { type: number }
+        image: { type: string }
+        ownerName: { type: string }
+        commission: { type: number }
+        exclusive: { type: boolean }
+        createdAt: { type: string }
+        matchScore: { type: ["number", "null"] }
+    PropertyDetail:
+      allOf:
+        - $ref: "#/components/schemas/Property"
+        - type: object
+          required: [description, features, recommendations, activities]
+          properties:
+            description: { type: string }
+            features:
+              type: array
+              items: { type: string }
+            recommendations:
+              type: array
+              items: { $ref: "#/components/schemas/Client" }
+            activities:
+              type: array
+              items: { $ref: "#/components/schemas/Activity" }
+    PropertyInput:
+      type: object
+      required: [title, type, purpose, price, city, neighborhood, bedrooms, bathrooms, parking, area]
+      properties:
+        title: { type: string }
+        type: { type: string }
+        purpose: { type: string }
+        price: { type: number }
+        city: { type: string }
+        neighborhood: { type: string }
+        address: { type: string }
+        bedrooms: { type: integer }
+        suites: { type: integer }
+        bathrooms: { type: integer }
+        parking: { type: integer }
+        area: { type: number }
+        description: { type: string }
+        ownerName: { type: string }
+        commission: { type: number }
+    PropertyUpdate:
+      type: object
+      properties:
+        title: { type: string }
+        price: { type: number }
+        status: { type: string }
+        description: { type: string }
+    Task:
+      type: object
+      required: [id, title, type, date, priority, status]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        type: { type: string }
+        date: { type: string }
+        time: { type: ["string", "null"] }
+        priority: { type: string }
+        status: { type: string }
+        clientName: { type: ["string", "null"] }
+        propertyTitle: { type: ["string", "null"] }
+        ownerName: { type: string }
+    TaskInput:
+      type: object
+      required: [title, type, date, priority]
+      properties:
+        title: { type: string }
+        description: { type: string }
+        type: { type: string }
+        date: { type: string }
+        time: { type: string }
+        priority: { type: string }
+        clientName: { type: string }
+        propertyTitle: { type: string }
+    TaskUpdate:
+      type: object
+      properties:
+        title: { type: string }
+        status: { type: string }
+        date: { type: string }
+        priority: { type: string }
+    Visit:
+      type: object
+      required: [id, clientName, propertyTitle, date, time, status, location]
+      properties:
+        id: { type: integer }
+        clientName: { type: string }
+        propertyTitle: { type: string }
+        date: { type: string }
+        time: { type: string }
+        status: { type: string }
+        location: { type: string }
+        feedback: { type: ["string", "null"] }
+    VisitInput:
+      type: object
+      required: [clientName, propertyTitle, date, time, location]
+      properties:
+        clientName: { type: string }
+        propertyTitle: { type: string }
+        date: { type: string }
+        time: { type: string }
+        location: { type: string }
+        notes: { type: string }
+    Proposal:
+      type: object
+      required: [id, clientName, propertyTitle, proposedValue, status, validUntil]
+      properties:
+        id: { type: integer }
+        clientName: { type: string }
+        propertyTitle: { type: string }
+        advertisedValue: { type: number }
+        proposedValue: { type: number }
+        entry: { type: number }
+        status: { type: string }
+        validUntil: { type: string }
+    Capture:
+      type: object
+      required: [id, ownerName, propertyTitle, stage, askingValue, nextFollowUp]
+      properties:
+        id: { type: integer }
+        ownerName: { type: string }
+        propertyTitle: { type: string }
+        stage: { type: string }
+        askingValue: { type: number }
+        suggestedValue: { type: ["number", "null"] }
+        nextFollowUp: { type: string }
+        exclusive: { type: boolean }
+    Commission:
+      type: object
+      required: [id, clientName, propertyTitle, soldValue, gross, net, status]
+      properties:
+        id: { type: integer }
+        clientName: { type: string }
+        propertyTitle: { type: string }
+        soldValue: { type: number }
+        percentage: { type: number }
+        gross: { type: number }
+        net: { type: number }
+        expectedDate: { type: ["string", "null"] }
+        receivedDate: { type: ["string", "null"] }
+        status: { type: string }
+    Reports:
+      type: object
+      required: [sources, stages, visits, proposals, sales, neighborhoods, propertyTypes]
+      properties:
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/CountPoint" }
+        stages:
+          type: array
+          items: { $ref: "#/components/schemas/CountPoint" }
+        visits: { type: integer }
+        proposals: { type: integer }
+        sales: { type: integer }
+        neighborhoods:
+          type: array
+          items: { $ref: "#/components/schemas/CountPoint" }
+        propertyTypes:
+          type: array
+          items: { $ref: "#/components/schemas/CountPoint" }
+    WebhookLeadInput:
+      type: object
+      required: [name, phone, source]
+      properties:
+        name: { type: string }
+        phone: { type: string }
+        source: { type: string }
+        interest: { type: string }
+        message: { type: string }

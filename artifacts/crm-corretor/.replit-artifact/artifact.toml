@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "CRM Corretor"
+description = "CRM imobiliário completo para corretores brasileiros gerenciarem leads, clientes, imóveis, visitas, propostas, captações, tarefas e comissões com dados persistentes e dashboards executivos."
+version = "1.0.0"
+id = "artifacts/crm-corretor"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21726
+
+[services.development]
+run = "pnpm --filter @workspace/crm-corretor run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/crm-corretor", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/crm-corretor/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21726"
+BASE_PATH = "/"
